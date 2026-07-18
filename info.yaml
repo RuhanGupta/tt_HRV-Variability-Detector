@@ -9,7 +9,7 @@ project:
   tiles: "2x2"
   top_module: "tt_um_fatigue_monitor"
   source_files:
-    - "main.v"
+    - "project.v"
     - "supporting_modules.v"
   pinout:
     # Inputs
