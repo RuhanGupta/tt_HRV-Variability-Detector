@@ -1,19 +1,16 @@
 # Tiny Tapeout project information
 project:
+  title:        "Fatigue Monitor (PPG Pulse-Interval Variability)"
+  author:       "Ruhan Gupta"
+  discord:      ""
+  description:  "Reads IR PPG samples from a MAX30102 over I2C, detects pulse peaks, and raises an alert on a sustained drop in pulse-interval variability"
+  language:     "Verilog"
+  clock_hz:     10000000
+  tiles: "2x2"
+  top_module: "tt_um_fatigue_monitor"
   source_files:
     - "main.v"
     - "supporting_modules.v"
-  top_module: "tt_um_fatigue_monitor"
-  title: "Fatigue Monitor (PPG Pulse-Interval Variability)"
-  author: "Ruhan Gupta"
-  discord: ""
-  description: "Reads IR PPG samples from a MAX30102 over I2C, detects pulse peaks, and raises an alert on a sustained drop in pulse-interval variability"
-  language: "Verilog"
-  clock_hz: 10000000
-
-  # Placeholder — real value only known after hardening. Adjust once CI reports actual area.
-  tiles: "2x2"
-
   pinout:
     # Inputs
     ui[0]: ""
@@ -42,5 +39,4 @@ project:
     uio[5]: ""
     uio[6]: ""
     uio[7]: ""
-
-yaml_version: 6
+  yaml_version: 6
