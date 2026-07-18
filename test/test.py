@@ -47,10 +47,12 @@ async def test_still_initializing_early(dut):
 
 @cocotb.test()
 async def test_sensor_fault_detected_with_no_sensor(dut):
-    # With SDA/SCL held low the whole time, every I2C transaction should
-    # fail immediately (bus never looks idle-high), so sensor_fault should
-    # assert well within this window.
+    # Each failed transaction costs several I2C byte-level clock-stretch
+    # timeouts (~1600 cycles each) before the controller gives up and
+    # retries; FAULT_RETRY_LIMIT=8 attempts are needed before sensor_fault
+    # asserts, so this needs a generous cycle budget, not just a few
+    # thousand cycles.
     await start(dut)
-    await ClockCycles(dut.clk, 20000)
+    await ClockCycles(dut.clk, 150000)
     val = uo(dut)
     assert (val >> 1) & 1 == 1, "sensor_fault should assert with no sensor present"
