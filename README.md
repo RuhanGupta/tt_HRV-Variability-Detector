@@ -1,5 +1,7 @@
 ![](../../workflows/gds/badge.svg) ![](../../workflows/docs/badge.svg) ![](../../workflows/test/badge.svg) ![](../../workflows/fpga/badge.svg)
 
+This project is a Tiny Tapeout ASIC that reads a MAX30102 pulse-oximeter breakout over I2C, detects heartbeats in the IR signal, and tracks how much the time between beats varies. After learning a short personal baseline, it raises alert_out when that variability stays well below normal.
+
 # Tiny Tapeout Verilog Project Template
 
 - [Read the documentation for project](docs/info.md)
