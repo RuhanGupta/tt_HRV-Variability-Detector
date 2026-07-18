@@ -2,13 +2,34 @@ module main (
     input wire clk,
     input wire rst_n,
     input wire sample_valid,
-    input wire peak_valid,
+    input wire [17:0] raw_sample,
     output alert_out,
     output [9:0] main_baseline_variability,
     output main_baseline_valid,
     output [9:0] main_current_variability,
     output main_variability_valid
 );
+    wire signed [18:0] ac_sample;
+    wire               filter_valid;
+    wire               peak_valid;
+
+    dc_filter dc (
+        .clk(clk),
+        .rst_n(rst_n),
+        .sample_valid(sample_valid),
+        .raw_sample(raw_sample),
+        .ac_sample(ac_sample),
+        .filter_valid(filter_valid)
+    );
+
+    peak_detector pd (
+        .clk(clk),
+        .rst_n(rst_n),
+        .filter_valid(filter_valid),
+        .ac_sample(ac_sample),
+        .peak_valid(peak_valid)
+    );
+
     wire [9:0] interval_out;
     wire interval_valid;
 
