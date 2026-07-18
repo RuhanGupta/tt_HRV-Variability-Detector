@@ -47,12 +47,16 @@ async def test_still_initializing_early(dut):
 
 @cocotb.test()
 async def test_sensor_fault_detected_with_no_sensor(dut):
-    # Each failed transaction costs several I2C byte-level clock-stretch
-    # timeouts (~1600 cycles each) before the controller gives up and
-    # retries; FAULT_RETRY_LIMIT=8 attempts are needed before sensor_fault
-    # asserts, so this needs a generous cycle budget, not just a few
-    # thousand cycles.
+    # sensor_fault pulses periodically rather than staying high -- the
+    # controller clears it and retries initialization from scratch each
+    # time a fault-wait period ends. Poll across several retry cycles
+    # instead of sampling a single fixed instant, which could land on
+    # either phase.
     await start(dut)
-    await ClockCycles(dut.clk, 150000)
-    val = uo(dut)
-    assert (val >> 1) & 1 == 1, "sensor_fault should assert with no sensor present"
+    seen_fault = False
+    for _ in range(30000):
+        await ClockCycles(dut.clk, 1)
+        if (uo(dut) >> 1) & 1:
+            seen_fault = True
+            break
+    assert seen_fault, "sensor_fault never asserted within the poll window"
