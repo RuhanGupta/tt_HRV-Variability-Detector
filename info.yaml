@@ -6,7 +6,7 @@ project:
   description:  "Reads IR PPG samples from a MAX30102 over I2C, detects pulse peaks, and raises an alert on a sustained drop in pulse-interval variability"
   language:     "Verilog"
   clock_hz:     10000000
-  tiles: "2x2"
+  tiles: "1x2"
   top_module:  "tt_um_fatigue_monitor"
   source_files:
     - "project.v"
