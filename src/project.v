@@ -4,9 +4,9 @@ module main (
     input wire sample_valid,
     input wire [17:0] raw_sample,
     output alert_out,
-    output [9:0] main_baseline_variability,
+    output [7:0] main_baseline_variability,
     output main_baseline_valid,
-    output [9:0] main_current_variability,
+    output [7:0] main_current_variability,
     output main_variability_valid,
     output beat_debug
 );
@@ -31,16 +31,16 @@ module main (
         .peak_valid(peak_valid)
     );
 
-    wire [9:0] interval_out;
+    wire [7:0] interval_out;
     wire interval_valid;
 
-    wire [9:0] accepted_interval;
+    wire [7:0] accepted_interval;
     wire accepted_interval_valid;
 
-    wire [9:0] current_variability;
+    wire [7:0] current_variability;
     wire variability_valid;
 
-    wire [9:0] baseline_variability;
+    wire [7:0] baseline_variability;
     wire baseline_valid;
 
     interval_tracker tracker (

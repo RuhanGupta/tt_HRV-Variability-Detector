@@ -3,11 +3,11 @@ module interval_tracker (
     input peak_valid, 
     input wire clk,
     input wire rst_n,
-    output reg [9:0] interval_out,
+    output reg [7:0] interval_out,
     output reg interval_valid
 );
     reg have_previous_peak;
-    reg [9:0] interval_counter;
+    reg [7:0] interval_counter;
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin 
@@ -30,8 +30,8 @@ module interval_tracker (
                     interval_counter <= 0;
                 end
                 else begin 
-                    if (interval_counter >= 10'd1022) begin 
-                        interval_counter <= 10'd1022;
+                    if (interval_counter >= 8'd254) begin 
+                        interval_counter <= 8'd254;
                     end
                 end
             end
@@ -42,11 +42,11 @@ endmodule
 
 
 module interval_validator (
-    input [9:0] interval_in, 
+    input [7:0] interval_in, 
     input interval_valid,
     input wire clk,
     input wire rst_n,
-    output reg [9:0] accepted_interval, 
+    output reg [7:0] accepted_interval, 
     output reg accepted_interval_valid
 );
 
@@ -68,16 +68,16 @@ module interval_validator (
 endmodule
 
 module variability_calculator (
-    input [9:0] accepted_interval,
+    input [7:0] accepted_interval,
     input accepted_interval_valid,
     input wire clk,
     input wire rst_n,
-    output reg [9:0] current_variability, 
+    output reg [7:0] current_variability, 
     output reg variability_valid
 );
-    reg [9:0] previous_interval;
+    reg [7:0] previous_interval;
     reg have_previous_interval;
-    reg [12:0] difference_sum;
+    reg [10:0] difference_sum;
     reg [3:0] difference_count;
 
     always @(posedge clk or negedge rst_n) begin
@@ -97,7 +97,7 @@ module variability_calculator (
                     have_previous_interval <= 1;
                 end
                 else begin : diff_calc
-                    reg [9:0] difference;
+                    reg [7:0] difference;
                     if (accepted_interval > previous_interval) begin
                         difference = accepted_interval - previous_interval;
                     end else begin
@@ -120,14 +120,14 @@ module variability_calculator (
 endmodule
 
 module calibration_controller (
-    input [9:0] current_variability,
+    input [7:0] current_variability,
     input variability_valid,
     input wire clk,
     input wire rst_n,
-    output reg [9:0] baseline_variability,
+    output reg [7:0] baseline_variability,
     output reg baseline_valid
 );
-    reg [13:0] baseline_sum;
+    reg [11:0] baseline_sum;
     reg [4:0] baseline_count; 
 
     always @(posedge clk or negedge rst_n) begin
@@ -153,9 +153,9 @@ module calibration_controller (
 endmodule
 
 module alert_controller (
-    input [9:0] current_variability,
+    input [7:0] current_variability,
     input variability_valid,
-    input [9:0] baseline_variability,
+    input [7:0] baseline_variability,
     input baseline_valid, 
     input wire clk,
     input wire rst_n,
@@ -165,7 +165,7 @@ module alert_controller (
 
     reg [2:0] low_count;
 
-    wire [9:0] threshold = baseline_variability - (baseline_variability >> 2); // 75% of baseline
+    wire [7:0] threshold = baseline_variability - (baseline_variability >> 2); // 75% of baseline
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -270,30 +270,34 @@ module peak_detector #(
     input wire signed [18:0] ac_sample,
     output reg peak_valid
 );
-    reg [18:0] envelope;
-    reg [18:0] candidate_val;
+    reg [12:0] envelope;
+    reg [12:0] candidate_val;
     reg rising_seen;
-    reg [8:0] refractory_count; 
-    reg [9:0] warmup_count; 
+    reg [5:0] refractory_count; 
+    reg [7:0] warmup_count; 
 
     wire signed [19:0] polarity_val = POLARITY_INVERT ? -{ac_sample[18], ac_sample}
                                                         : {ac_sample[18], ac_sample};
-    wire [18:0] mag = polarity_val[19] ? 19'd0 : polarity_val[18:0];
+    // Full-width magnitude, then saturate into the 13-bit envelope datapath.
+    // Real traces keep the envelope <= ~4677 (13-bit cap 8191); only the pre-settle
+    // DC transient produces a large mag, which this clamp bounds safely.
+    wire [18:0] mag_full = polarity_val[19] ? 19'd0 : polarity_val[18:0];
+    wire [12:0] mag = (|mag_full[18:13]) ? 13'h1FFF : mag_full[12:0];
 
-    wire [18:0] envelope_next = (mag > envelope) ? mag
+    wire [12:0] envelope_next = (mag > envelope) ? mag
                                                    : (envelope - (envelope >> ENVELOPE_DECAY_SHIFT));
-    wire [18:0] threshold_next = envelope_next - (envelope_next >> THRESHOLD_SHIFT);
+    wire [12:0] threshold_next = envelope_next - (envelope_next >> THRESHOLD_SHIFT);
 
-    wire in_warmup = (warmup_count < WARMUP_SAMPLES[9:0]);
+    wire in_warmup = (warmup_count < WARMUP_SAMPLES[7:0]);
     wire in_refractory = (refractory_count != 0);
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            envelope <= 19'd0;
-            candidate_val <= 19'd0;
+            envelope <= 13'd0;
+            candidate_val <= 13'd0;
             rising_seen <= 1'b0;
-            refractory_count <= 9'd0;
-            warmup_count <= 10'd0;
+            refractory_count <= 6'd0;
+            warmup_count <= 8'd0;
             peak_valid <= 1'b0;
         end
         else begin
@@ -303,10 +307,10 @@ module peak_detector #(
                 envelope <= envelope_next;
 
                 if (in_warmup)
-                    warmup_count <= warmup_count + 10'd1;
+                    warmup_count <= warmup_count + 8'd1;
 
                 if (in_refractory) begin
-                    refractory_count <= refractory_count - 9'd1;
+                    refractory_count <= refractory_count - 6'd1;
                 end
                 else if (!in_warmup) begin
                     if (!rising_seen) begin
@@ -322,7 +326,7 @@ module peak_detector #(
                         else begin
                             peak_valid <= 1'b1;
                             rising_seen <= 1'b0;
-                            refractory_count <= REFRACTORY_SAMPLES[8:0];
+                            refractory_count <= REFRACTORY_SAMPLES[5:0];
                         end
                     end
                 end
@@ -912,13 +916,13 @@ module max30102_controller #(
         S_WAIT_RESET_WRITE = 5'd22;
 
     reg [4:0] seq_state;
-    reg [15:0] power_wait_count;
-    reg [15:0] poll_wait_count;
+    reg [10:0] power_wait_count;
+    reg [7:0] poll_wait_count;
     reg [4:0] fault_count;
-    reg [4:0] fifo_wr_ptr, fifo_rd_ptr;
+    reg [4:0] fifo_wr_ptr;
     reg [4:0] fifo_available;
 
-    localparam [15:0] POWER_WAIT_CYCLES = 16'd2000; 
+    localparam [10:0] POWER_WAIT_CYCLES = 11'd2000; 
 
     
     
@@ -926,11 +930,10 @@ module max30102_controller #(
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             seq_state <= S_POWER_WAIT;
-            power_wait_count <= 16'd0;
-            poll_wait_count <= 16'd0;
+            power_wait_count <= 11'd0;
+            poll_wait_count <= 8'd0;
             fault_count <= 5'd0;
             fifo_wr_ptr <= 5'd0;
-            fifo_rd_ptr <= 5'd0;
             fifo_available <= 5'd0;
             raw_sample <= 18'd0;
             sample_valid <= 1'b0;
@@ -971,7 +974,7 @@ module max30102_controller #(
                         if (power_wait_count == POWER_WAIT_CYCLES)
                             seq_state <= S_READ_PARTID;
                         else
-                            power_wait_count <= power_wait_count + 16'd1;
+                            power_wait_count <= power_wait_count + 11'd1;
                     end
 
                     S_READ_PARTID: begin
@@ -1146,14 +1149,13 @@ module max30102_controller #(
                             txn_start <= 1'b1;
                             seq_state <= S_RUN_READ_RDPTR;
                         end
-                        if (txn_done) begin
-                            if (!txn_error)
-                                fifo_wr_ptr <= txn_read_reg_result[4:0];
-                        end
                     end
                     S_RUN_READ_RDPTR: begin
+                        // txn_done here belongs to the WR_PTR read started in
+                        // S_RUN_READ_WRPTR, so capture fifo_wr_ptr in THIS state.
                         if (txn_done) begin
                             if (!txn_error) begin
+                                fifo_wr_ptr <= txn_read_reg_result[4:0];
                                 txn_op <= TXN_READ_REG;
                                 txn_reg_addr <= REG_FIFO_RD_PTR;
                                 txn_start <= 1'b1;
@@ -1166,7 +1168,6 @@ module max30102_controller #(
                     S_RUN_CHECK_AVAIL: begin
                         if (txn_done) begin
                             if (!txn_error) begin
-                                fifo_rd_ptr <= txn_read_reg_result[4:0];
                                 fifo_available <= (fifo_wr_ptr - txn_read_reg_result[4:0]) & 5'h1F;
                                 seq_state <= S_RUN_READ_SAMPLE; 
                             end
@@ -1177,7 +1178,7 @@ module max30102_controller #(
                     S_RUN_READ_SAMPLE: begin
                         if (fifo_available == 5'd0) begin
                             
-                            poll_wait_count <= 16'd0;
+                            poll_wait_count <= 8'd0;
                             seq_state <= S_RUN_POLL_WAIT;
                         end
                         else if (!txn_busy) begin
@@ -1199,25 +1200,25 @@ module max30102_controller #(
                         end
                     end
                     S_RUN_POLL_WAIT: begin
-                        if (poll_wait_count == POLL_IDLE_TICKS[15:0])
+                        if (poll_wait_count == POLL_IDLE_TICKS[7:0])
                             seq_state <= S_RUN_READ_WRPTR;
                         else if (i2c_tick)
-                            poll_wait_count <= poll_wait_count + 16'd1;
+                            poll_wait_count <= poll_wait_count + 8'd1;
                     end
 
                     
                     S_FAULT_WAIT: begin
                         sensor_fault <= 1'b1;
                         calibrating_init <= 1'b1;
-                        if (poll_wait_count == POLL_IDLE_TICKS[15:0]) begin
-                            poll_wait_count <= 16'd0;
+                        if (poll_wait_count == POLL_IDLE_TICKS[7:0]) begin
+                            poll_wait_count <= 8'd0;
                             fault_count <= 5'd0;
-                            power_wait_count <= 16'd0;
+                            power_wait_count <= 11'd0;
                             sensor_fault <= 1'b0;
                             seq_state <= S_POWER_WAIT; 
                         end
                         else if (i2c_tick)
-                            poll_wait_count <= poll_wait_count + 16'd1;
+                            poll_wait_count <= poll_wait_count + 8'd1;
                     end
 
                     default: seq_state <= S_POWER_WAIT;
@@ -1284,8 +1285,8 @@ module tt_um_fatigue_monitor (
     wire baseline_valid;
     wire variability_valid;
     wire beat_debug;
-    wire [9:0] baseline_variability_unused;
-    wire [9:0] current_variability_unused;
+    wire [7:0] baseline_variability_unused;
+    wire [7:0] current_variability_unused;
 
     main u_main (
         .clk (clk),
